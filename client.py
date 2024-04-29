@@ -2,6 +2,7 @@ import socket
 import argparse
 import threading
 import time
+import json
 
 # A global set to keep track of message IDs that have been processed
 seen_messages = set()
@@ -37,11 +38,12 @@ def handle_peer_communication(peer_sock, connected_peers):
         try:
             message = peer_sock.recv(1024).decode()
             if message:
-                msg_id, text = message.split(':', 1)
+                message_data = json.loads(message)
+                msg_id = message_data['message_id']
                 if msg_id not in seen_messages:
                     seen_messages.add(msg_id)
-                    print(f"Message from peer: {text}")
-                    # Forward the message to all other peers
+                    print(
+                        f"Message from {message_data['last_sender']}: {message_data['content']}")
                     forward_message(message, peer_sock, connected_peers)
             else:
                 break
@@ -56,16 +58,30 @@ def forward_message(message, source_sock, connected_peers):
     for sock in connected_peers:
         if sock != source_sock:
             try:
-                sock.sendall(message.encode())
+                updated_message = json.loads(message)
+                # Update last sender to current node's hostname and port
+                updated_message['last_sender'] = f"{socket.gethostname()}:{source_sock.getsockname()[1]}"
+                sock.sendall(json.dumps(updated_message).encode())
             except Exception as e:
                 print(f"Error forwarding message to {sock}: {e}")
+
+
+def create_message(originator, last_sender, content):
+    message_id = f"{time.time()}"
+    message = {
+        'originator': originator,
+        'last_sender': last_sender,
+        'message_id': message_id,
+        'content': content
+    }
+    return json.dumps(message)
 
 
 def start_listening(my_port, connected_peers):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(('', my_port))
     server_socket.listen()
-    print(f"Listening for peer connections on port {my_port}")
+    print(f"\nListening for peer connections on port {my_port}")
     handle_incoming_connections(server_socket, connected_peers)
 
 
@@ -86,13 +102,13 @@ def connect_to_peers(peers, my_port, connected_peers):
                 print(f"Failed to connect to {host}:{port}: {e}")
 
 
-def send_broadcast_message(message, connected_peers):
-    msg_id = f"{time.time()}"
-    full_message = f"{msg_id}:{message}"
-    seen_messages.add(msg_id)
+def send_broadcast_message(content, connected_peers, my_port):
+    my_hostname_port = f"{socket.gethostname()}:{my_port}"
+    message = create_message(my_hostname_port, my_hostname_port, content)
+    seen_messages.add(json.loads(message)['message_id'])
     for sock in connected_peers:
         try:
-            sock.sendall(full_message.encode())
+            sock.sendall(message.encode())
         except Exception as e:
             print(f"Failed to send broadcast message to {sock}: {e}")
 
@@ -104,13 +120,12 @@ def main(bootstrap_host, bootstrap_port, my_port):
         connect_to_peers(peers, my_port, connected_peers)
     threading.Thread(target=start_listening, args=(
         my_port, connected_peers)).start()
-
     try:
         while True:
             msg = input("Enter message to broadcast or type 'exit' to quit: ")
             if msg == 'exit':
                 break
-            send_broadcast_message(msg, connected_peers)
+            send_broadcast_message(msg, connected_peers, my_port)
     except KeyboardInterrupt:
         print("Client is shutting down.")
     finally:
