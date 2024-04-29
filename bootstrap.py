@@ -3,7 +3,7 @@ import threading
 
 HOST = '0.0.0.0'
 PORT = 9999
-clients = {}
+clients = set()
 
 
 def handle_client(conn, addr):
@@ -15,17 +15,16 @@ def handle_client(conn, addr):
                 break
             print(f"Received data: {data}")
             if 'request_nodes' in data:
-                response = ', '.join([f"{k}:{v}" for k, v in clients.items()])
+                response = ','.join(clients)
                 conn.sendall(response.encode())
             elif 'register' in data:
                 _, host, port = data.split(':')
-                clients[addr[0]] = port
+                key = f'{host}:{port}'
+                clients.add(key)
         except Exception as e:
             print(f"Error: {e}")
             break
     conn.close()
-    if addr[0] in clients:
-        del clients[addr[0]]
     print(f"Disconnected by {addr}")
 
 
