@@ -27,6 +27,11 @@ def handle_client(conn, addr):
                 key = f'{host}:{port}'
                 if key in clients:
                     clients[key] = time.time()  # Update last seen time
+            elif 'do_not_join' in data:
+                _, host, port = data.split(':')
+                key = f'{host}:{port}'
+                if key in clients:
+                    del clients[key]
             print(f"Active clients: {clients}")
         except Exception as e:
             print(f"Error: {e}")
