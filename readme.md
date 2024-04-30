@@ -6,6 +6,9 @@ This is a part of GT CS6675 final project where we attempt to utilize P2P networ
 ## Approach
 We build a simple P2P network using Python's socket library. For node discovery, we make use of bootstrap nodes as an entry point to the network. Each node is able to broadcast files to all other nodes in the network via propagation.
 
+### Disconnect Nodes
+For the bootstrap node to keep track of health of nodes, we implement a simple heartbeat mechanism. If a node fails to send a heartbeat within a certain time frame, the bootstrap node will remove the node from its list of known nodes. Otherwise, the network would grow indefinitely with dead nodes.
+
 ## Usage and Workflow
 1. Start the bootstrap node
 ```bash
